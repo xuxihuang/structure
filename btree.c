@@ -4,6 +4,10 @@
 
 btree_node_t* btree_alloc_node(int t);
 
+int btree_split_node(btree_node_t* node, int ichild, int t);
+
+int btree_insert_not_full(btree_node_t* node, char key, int t);
+
 btree_t* btree_init(int t)
 {
 	btree_t* tree = (btree_t*)malloc(sizeof(btree_t));
@@ -16,77 +20,95 @@ btree_t* btree_init(int t)
 	return tree;
 }
 
-int btree_split(btree_node_t* split_parent, int ichild, int t)
+int btree_split_node(btree_node_t* split_parent, int ichild, int t)
 {
 	int i;
-	btree_node_t* child = split_parent[ichild];
+	btree_node_t* child = split_parent->childs[ichild];
 	btree_node_t* node = btree_alloc_node(t);
+	node->leaf = child->leaf;
+	node->parent = split_parent;
 
-	for(i = t; i < 2*t - 1; i++)
+	if(child->leaf)
 	{
-		node->key[i-t] = child[i];
-		node->nkey++;
-		child->nkey--;
-
-		node->childs[i-t] = child->childs[i];
-		node->nchild++;
-		child->nchild--;
+		for(i = 0; i < t -1 ; i++)
+		{
+			node->keys[i] = child->keys[i + t];
+			child->keys[i+t] = '\0';
+			node->nkey++;
+			child->nkey--;
+		}
 	}
+	else
+	{
+		for(i = 0; i < t - 1; i++)
+		{
+			node->keys[i] = child->keys[i + t];
+			child->keys[i+t] = '\0';
+			node->nkey++;
+			child->nkey--;
 
-	node->childs[t] = child->child[2*t - 1];
-	node->nchild++;
-	child->nchild--;
+			node->childs[i] = child->childs[i+t];
+			node->nchild++;
+			child->nchild--;
+		}
+
+		node->childs[node->nchild++] = child->childs[--child->nchild];
+
+	}
 
 	//shift back util ichild
 	for(i = split_parent->nkey; i > ichild; i--)
 	{
-		split_parent->key[i] = split->key[nkey - 1];
-		split_parent->child[i + 1] = split_parent->child[i];
+		split_parent->keys[i] = split_parent->keys[i - 1];
+		split_parent->childs[i + 1] = split_parent->childs[i];
 	}
 
-	split_parent->key[ichild - 1] = child->key[t -1];
+	split_parent->keys[ichild] = child->keys[t -1];
+	child->keys[t - 1] = '\0';
 	split_parent->nkey++;
+	child->nkey--;
 
-	split_parent->child[ichild] = node;
+	split_parent->childs[ichild + 1] = node;
 	split_parent->nchild++;
 
 	return 0;
 }
 
-int btree_insert_not_full(btree_node_type* node, char key, int t)
+int btree_insert_not_full(btree_node_t* node, char key, int t)
 {
 	int i,j;
 	
 	if(node->leaf)
 	{
 		i = 0;
-		while(i < node->nkey && node->key[i] < key)
+		while(i < node->nkey && node->keys[i] < key)
 			i++;
 		
-		if(i < node->nkey && node->key[i] == key)
+		if(i < node->nkey && node->keys[i] == key)
 			return 0;
 		
 		for(j = node->nkey; j < i; j--)
 		{
-			node->key[j] = node->key[j - 1];
+			node->keys[j] = node->keys[j - 1];
 		}
-		node->key[i] = key;
+		node->keys[i] = key;
+		node->nkey++;
 	}
 	else
 	{
 		i = 0;
-		while(i < node->nkey; && node->key[i] < key)
+		while(i < node->nkey && node->keys[i] < key)
 			i++;
-		if(i < node->nkey && node->key[i] == key)
+		if(i < node->nkey && node->keys[i] == key)
 			return 0;
 
-		if(node->child[i]->nkey == 2*t - 1)
+		if(node->childs[i]->nkey == 2*t - 1)
 		{
-			btree_split_node(node,i, t);
-			return btree_insert_not_full(node->child[i + 1], key, t);
+			btree_split_node(node, i, t);
+			return btree_insert_not_full(node->childs[i + 1], key, t);
 		}
 		else
-			return btree_insert_not_full(node->child[i], key, t);
+			return btree_insert_not_full(node->childs[i], key, t);
 	}
 
 
@@ -102,15 +124,19 @@ int btree_insert(btree_t* tree, char key)
 	if(root == NULL)
 	{
 		root = tree->root = btree_alloc_node(tree->t);
+		root->keys[0] = key;
+		root->nkey++;
+		return 0;
 	}
 	//root is full
 	if(root->nkey == 2*tree->t -1)
 	{
 		node = btree_alloc_node(tree->t);
+		node->leaf = 0;
 		tree->root = node;
 
 		root->parent = node;
-		node->child[0] = root;
+		node->childs[0] = root;
 		node->nchild++;
 
 		btree_split_node(node, 0, tree->t);
@@ -125,45 +151,6 @@ int btree_insert(btree_t* tree, char key)
 	return 0;
 }
 
-int btree_add(btree_t* tree, char key)
-{
-	int i;
-	btree_node_t* node = tree->root;
-	btree_node_t* child;
-
-	if(!node)
-	{
-		node = btree_alloc_node(tree->t);
-		tree->root = node;
-	}
-
-	//not full
-	if(node->nkey < tree->t)
-	{
-		i = 0;
-		while(i < node->nkey && node->keys[i] < key)
-			i++;
-
-		if(node->childs[i] == NULL)
-		{
-			child = btree_alloc_node(tree->t);
-			child->keys[0] = key;
-			child->nkey = 1;
-			node->childs[i] = child;
-			node->nchild++;
-		}
-		else
-		{
-			node->keys[i] = key;
-			node->nkey++;
-		}
-	}
-	else
-	{
-	}
-
-	return 0;
-}
 
 btree_node_t* btree_alloc_node(int t)
 {
@@ -175,7 +162,7 @@ btree_node_t* btree_alloc_node(int t)
 		node->childs = (btree_node_t**)malloc(sizeof(btree_node_t*) * t *2);
 		memset(node->childs, 0, sizeof(btree_node_t*) * t * 2);
 		node->nchild = 0;
-		node->leave = 1;
+		node->leaf = 1;
 		node->parent = NULL;
 	}
 	
@@ -191,11 +178,11 @@ btree_node_t* btree_search_node(btree_node_t* node, char key, int* index)
 	
 	if(node->keys[i] == key)
 	{
-		index = i;
+		int index = i;
 		return node;
 	}
 
-	if(node->leave)
+	if(node->leaf)
 		return NULL;
 
 	return btree_search_node(node->childs[i], key, index);
