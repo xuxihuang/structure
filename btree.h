@@ -6,11 +6,11 @@
 
 typedef struct btree_node_s
 {
-	char**	keys;
+	char*	keys;
 	int	nkey;
 	struct btree_node_s**	childs;
 	int	nchild;
-	int	leave;
+	int	leaf;
 	struct btree_node_s*	parent;
 } btree_node_t;
 
@@ -24,7 +24,7 @@ btree_t* btree_init(int t);
 
 int btree_add(btree_t* tree, char key);
 
-btree_node_t*	btree_search(btree_t* tree, char key);
+btree_node_t*	btree_search(btree_t* tree, char key, int* index);
 
 int btree_delete(btree_t* tree, char key);
 
