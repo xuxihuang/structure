@@ -3,6 +3,8 @@
 int main(int argc, char** argv)
 {
 	btree_t* tree;
+	btree_node_t* node;
+	int index;
 
 	tree = btree_init(2);
 
@@ -19,6 +21,12 @@ int main(int argc, char** argv)
 	btree_insert(tree, 'F');
 
 	btree_insert(tree, 'G');
+
+	node = btree_search(tree, 'I', &index);
+
+	node = btree_search(tree, 'G', &index);
+
+	node = btree_search(tree, 'C', &index);
 
 	return 0;
 }

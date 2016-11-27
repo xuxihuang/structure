@@ -178,7 +178,7 @@ btree_node_t* btree_search_node(btree_node_t* node, char key, int* index)
 	
 	if(node->keys[i] == key)
 	{
-		int index = i;
+		*index = i;
 		return node;
 	}
 
@@ -197,4 +197,80 @@ btree_node_t* btree_search(btree_t* tree, char key, int* index)
 		return NULL;
 
 	return btree_search_node(node, key, index);	
+}
+
+int btree_merge_and_delete_key(btree_node_t* node, int ikey, int t)
+{
+	btree_node_t* new_child = btree_alloc_node(t);
+	btree_node_t* prev_child = node->childs[ikey];
+	btree_node_t* next_child = node->childs[ikey + 1];
+
+	int i;
+	int prev_nkey = prev_child->nkey;
+	int next_nkey = prev_child->nkey;
+
+	new_child->leaf = prev_child->leaf;
+	new_child->parent = prev_child->parent;
+
+	for(i = 0; i < prev_child->nkey;i++)
+	{
+		new_child->keys[new_child->nkeys++] = prev_child->keys[i];
+		new_child->childs[new_child->nchild++] = prev_child->childs[i];
+	}
+	new_child->childs[new_child->nchild++] = prev_child->childs[prev_child->nchild - 1];
+
+	for(i = 0; i < next_child->nkey;i++)
+	{
+		new_child->keys[new_child->nkey++] = next_child->keys[i];
+		new_child->childs[new_child->nchild++] = next_child->childs[i];
+	}
+	new_child->childs[new_child->nchild++] = next_child->childs[next_child->nchild - 1];
+
+	
+
+	return 0;
+}
+
+int btree_delete_key(btree_node_t* node, int ikey, int t)
+{
+	int i;
+	btree_node_t* prev_child;
+	btree_node_t* next_child;
+	if(node->leaf)
+	{
+		for(i = ikey; i < node->nkey - 1;i++)
+			node->keys[i] = node[i + 1];
+		node->key[node->nkey - 1] = '\0';
+		node->nkey--;
+		return 0;
+	}
+	else
+	{
+		prev_child = node->childs[ikey];
+		next_child = node->childs[ikey + 1];
+
+		//merge
+		if(prev_child->nkey + next_child->nkey <= 2*t - 1)
+		{
+		}
+		else if(prev_child->nkey > t -1)
+		{
+		}
+		else
+		{
+		}
+	}
+
+	return -1;
+}
+
+int btree_delete(btree_t* tree, char key)
+{
+	int index;
+	btree_node_t* node = btree_search(tree, key, &index);
+
+	if(!node)
+		return -1;
+	
+	return btree_delete_key(node, index, tree->t);
 }
